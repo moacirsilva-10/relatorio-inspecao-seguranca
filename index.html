@@ -239,7 +239,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
           <button class="btn btn-primary" id="btn-salvar-key">Salvar configuração</button>
         </div>
         <p class="hint" id="cfg-key-status" style="margin-top:10px;"></p>
-        <p class="hint" style="margin-top:20px;color:#B0B4BC;">Versão do app: 2026-07-27-v4</p>
+        <p class="hint" style="margin-top:20px;color:#B0B4BC;">Versão do app: 2026-07-27-v5</p>
       </div>
     </section>
   </main>
@@ -482,13 +482,31 @@ async function chamarAnthropic(pendingFoto){
   return JSON.parse(limparJson(textBlock.text));
 }
 
-// Modelos de visão do Groq testados em ordem — se um sair do ar, tenta o próximo automaticamente.
-const GROQ_VISION_MODELS = [
-  'llama-4-scout-17b-16e-instruct',
-  'llama-4-maverick-17b-128e-instruct',
-  'llama-3.2-90b-vision-preview',
-  'llama-3.2-11b-vision-preview'
-];
+// Palavras-chave usadas para identificar modelos com suporte a imagem
+// na lista retornada pela própria API do Groq (evita depender de nomes fixos,
+// que o Groq costuma descontinuar com frequência).
+const GROQ_VISION_HINTS = /vision|scout|maverick|llava|multimodal|vl-/i;
+
+async function listarModelosGroq(apiKey){
+  const response = await fetch('https://api.groq.com/openai/v1/models', {
+    headers: { 'Authorization': 'Bearer ' + apiKey }
+  });
+  if(!response.ok){
+    const errBody = await response.text().catch(()=> '');
+    throw new Error(`Não foi possível listar os modelos do Groq (HTTP ${response.status}): ${errBody.slice(0,150)}`);
+  }
+  const data = await response.json();
+  return (data.data || []).map(m => m.id);
+}
+
+async function descobrirModelosVisaoGroq(apiKey){
+  const todos = await listarModelosGroq(apiKey);
+  const candidatos = todos.filter(id => GROQ_VISION_HINTS.test(id));
+  if(candidatos.length === 0){
+    throw new Error('Nenhum modelo com suporte a imagem foi encontrado na sua conta Groq agora. Modelos disponíveis: ' + todos.join(', '));
+  }
+  return candidatos;
+}
 
 async function chamarGroqComModelo(pendingFoto, model, apiKey){
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -523,9 +541,31 @@ async function chamarGroqComModelo(pendingFoto, model, apiKey){
 async function chamarGroq(pendingFoto){
   const apiKey = localStorage.getItem('groq_api_key');
   const tentativas = [];
-  for(const model of GROQ_VISION_MODELS){
+
+  // 1. Tenta primeiro o último modelo que funcionou (evita listar toda vez)
+  const modeloCache = localStorage.getItem('groq_vision_model_cache');
+  if(modeloCache){
     try{
-      return await chamarGroqComModelo(pendingFoto, model, apiKey);
+      return await chamarGroqComModelo(pendingFoto, modeloCache, apiKey);
+    }catch(e){
+      tentativas.push(`${modeloCache} (em cache) → ${e.message}`);
+      localStorage.removeItem('groq_vision_model_cache');
+    }
+  }
+
+  // 2. Pergunta ao Groq quais modelos de visão existem agora, e tenta cada um
+  let candidatos;
+  try{
+    candidatos = await descobrirModelosVisaoGroq(apiKey);
+  }catch(e){
+    throw new Error('Falha ao consultar modelos do Groq: ' + e.message);
+  }
+
+  for(const model of candidatos){
+    try{
+      const resultado = await chamarGroqComModelo(pendingFoto, model, apiKey);
+      localStorage.setItem('groq_vision_model_cache', model); // guarda o que funcionou
+      return resultado;
     }catch(e){
       console.warn('Modelo Groq indisponível:', model, e.message);
       tentativas.push(`${model} → ${e.message}`);
