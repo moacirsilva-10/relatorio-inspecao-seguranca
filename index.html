@@ -228,12 +228,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
           <div class="full">
             <label>Chave de API do Groq</label>
             <input type="password" id="cfg-groq-key" placeholder="gsk_...">
-            <p class="hint">Gere em <span style="font-family:'Roboto Mono',monospace;">console.groq.com/keys</span>.</p>
-          </div>
-          <div class="full">
-            <label>Modelo de visão do Groq</label>
-            <input type="text" id="cfg-groq-model" placeholder="llama-3.2-90b-vision-preview">
-            <p class="hint">O <span style="font-family:'Roboto Mono',monospace;">llama-3.3-70b-versatile</span> do seu outro app não lê imagens — precisa ser um modelo com "vision" no nome. Confira o nome exato disponível em <span style="font-family:'Roboto Mono',monospace;">console.groq.com/playground</span> (aba de modelos) e cole aqui. Se der erro de "modelo não encontrado", é sinal de que o nome mudou.</p>
+            <p class="hint">Gere em <span style="font-family:'Roboto Mono',monospace;">console.groq.com/keys</span>. Cole a chave e pronto — a ferramenta escolhe o modelo de visão automaticamente.</p>
           </div>
         </div>
 
@@ -362,7 +357,6 @@ function loadConfigView(){
   document.getElementById('cfg-provider').value = provider;
   document.getElementById('cfg-anthropic-key').value = localStorage.getItem('anthropic_api_key') || '';
   document.getElementById('cfg-groq-key').value = localStorage.getItem('groq_api_key') || '';
-  document.getElementById('cfg-groq-model').value = localStorage.getItem('groq_vision_model') || 'llama-3.2-90b-vision-preview';
   toggleProviderFields();
 
   const hasKey = provider === 'anthropic' ? !!localStorage.getItem('anthropic_api_key') : !!localStorage.getItem('groq_api_key');
@@ -381,23 +375,19 @@ document.getElementById('btn-salvar-key').addEventListener('click', ()=>{
     localStorage.setItem('anthropic_api_key', key);
   } else {
     const key = document.getElementById('cfg-groq-key').value.trim();
-    const model = document.getElementById('cfg-groq-model').value.trim();
-    if(!key || !model){
-      alert('Cole a chave de API do Groq e o nome do modelo de visão antes de salvar.');
+    if(!key){
+      alert('Cole a chave de API do Groq antes de salvar.');
       return;
     }
     localStorage.setItem('groq_api_key', key);
-    localStorage.setItem('groq_vision_model', model);
   }
   document.getElementById('cfg-key-status').textContent = 'Configuração salva neste navegador.';
 });
 document.getElementById('btn-remover-key').addEventListener('click', ()=>{
   localStorage.removeItem('anthropic_api_key');
   localStorage.removeItem('groq_api_key');
-  localStorage.removeItem('groq_vision_model');
   document.getElementById('cfg-anthropic-key').value = '';
   document.getElementById('cfg-groq-key').value = '';
-  document.getElementById('cfg-groq-model').value = '';
   document.getElementById('cfg-key-status').textContent = 'Chaves removidas.';
 });
 
@@ -491,10 +481,15 @@ async function chamarAnthropic(pendingFoto){
   return JSON.parse(limparJson(textBlock.text));
 }
 
-async function chamarGroq(pendingFoto){
-  const apiKey = localStorage.getItem('groq_api_key');
-  const model = localStorage.getItem('groq_vision_model') || 'llama-3.2-90b-vision-preview';
+// Modelos de visão do Groq testados em ordem — se um sair do ar, tenta o próximo automaticamente.
+const GROQ_VISION_MODELS = [
+  'llama-4-scout-17b-16e-instruct',
+  'llama-4-maverick-17b-128e-instruct',
+  'llama-3.2-90b-vision-preview',
+  'llama-3.2-11b-vision-preview'
+];
 
+async function chamarGroqComModelo(pendingFoto, model, apiKey){
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -516,12 +511,26 @@ async function chamarGroq(pendingFoto){
 
   if(!response.ok){
     const errBody = await response.text().catch(()=> '');
-    throw new Error(`Falha na chamada da API Groq (${response.status}). Verifique se o nome do modelo em Configurações ainda é válido. Detalhes: ${errBody.slice(0,200)}`);
+    throw new Error(`HTTP ${response.status}: ${errBody.slice(0,200)}`);
   }
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content;
   if(!content) throw new Error('Resposta sem conteúdo');
   return JSON.parse(limparJson(content));
+}
+
+async function chamarGroq(pendingFoto){
+  const apiKey = localStorage.getItem('groq_api_key');
+  let lastError = null;
+  for(const model of GROQ_VISION_MODELS){
+    try{
+      return await chamarGroqComModelo(pendingFoto, model, apiKey);
+    }catch(e){
+      console.warn('Modelo Groq indisponível:', model, e.message);
+      lastError = e;
+    }
+  }
+  throw new Error('Nenhum modelo de visão do Groq respondeu. Detalhes: ' + (lastError?.message || ''));
 }
 
 async function analisarFotoComIA(){
