@@ -178,6 +178,11 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
             <div><label>Local / Pavimento (opcional)</label><input type="text" id="i-local" placeholder="Ex: PAV.: TÉRREO"></div>
             <div><label>Criada</label><input type="datetime-local" id="i-criada"></div>
             <div class="full"><label>Descrição</label><textarea id="i-descricao" placeholder="Descreva o que foi observado..."></textarea></div>
+            <div class="full">
+              <label>Norma de referência (NR)</label>
+              <input type="text" id="i-norma" placeholder="Ex: NR-18, item 18.13.1">
+              <p class="hint">Preenchido automaticamente pela IA quando você usa "Analisar foto com IA" / "Melhorar com IA" — pode ajustar manualmente.</p>
+            </div>
             <div class="full"><label>Riscos (um por linha, opcional)</label><textarea id="i-riscos" placeholder="Tropeço/queda&#10;Acesso dificultado em emergência"></textarea></div>
             <div class="full"><label>Adequação / Exigências (um por linha, opcional)</label><textarea id="i-adequacao" placeholder="Remover materiais e desobstruir o caminho&#10;Manter rota livre e sinalizada"></textarea></div>
             <div class="full"><label>Observações finais (opcional)</label><textarea id="i-obs" placeholder="Parágrafo de encerramento, se necessário..."></textarea></div>
@@ -243,7 +248,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
           <button class="btn btn-primary" id="btn-salvar-key">Salvar configuração</button>
         </div>
         <p class="hint" id="cfg-key-status" style="margin-top:10px;"></p>
-        <p class="hint" style="margin-top:20px;color:#B0B4BC;">Versão do app: 2026-07-27-v6</p>
+        <p class="hint" style="margin-top:20px;color:#B0B4BC;">Versão do app: 2026-07-27-v7</p>
       </div>
     </section>
   </main>
@@ -455,9 +460,22 @@ function compressImage(file){
   });
 }
 
-const PROMPT_ANALISE_FOTO = `Você é um técnico de segurança do trabalho analisando uma foto de um canteiro de obras para um relatório de não conformidade. Observe a imagem com atenção e responda SOMENTE com um JSON válido, sem markdown, sem crases, sem texto antes ou depois, no formato exato:
-{"descricao": "parágrafo objetivo em português, no tom formal de um relatório de segurança do trabalho, descrevendo a não conformidade observada e solicitando a regularização", "riscos": ["risco 1", "risco 2"], "adequacao": ["ação corretiva 1", "ação corretiva 2", "ação corretiva 3"]}
-Se a imagem não mostrar nenhuma não conformidade clara de segurança do trabalho, ainda assim descreva objetivamente o que é visível na cena e liste riscos/ações genéricas cabíveis. Responda em português do Brasil.`;
+const NR_REFERENCIA = `Normas Regulamentadoras (NR) do Ministério do Trabalho mais aplicáveis a canteiros de obra, para você usar como referência:
+- NR-18: Condições de Segurança e Saúde no Trabalho na Indústria da Construção (organização do canteiro, andaimes, escadas, proteção de vãos e periferia, armazenagem de materiais)
+- NR-35: Trabalho em Altura (acima de 2m, guarda-corpos, ancoragem, acesso)
+- NR-6: Equipamento de Proteção Individual (EPI)
+- NR-10: Segurança em Instalações e Serviços em Eletricidade
+- NR-12: Segurança no Trabalho em Máquinas e Equipamentos
+- NR-11: Transporte, Movimentação, Armazenagem e Manuseio de Materiais
+- NR-24: Condições Sanitárias e de Conforto nos Locais de Trabalho`;
+
+const PROMPT_ANALISE_FOTO = `Você é um técnico de segurança do trabalho analisando uma foto de um canteiro de obras para um relatório de não conformidade. A análise DEVE ser fundamentada nas Normas Regulamentadoras (NR) do Ministério do Trabalho do Brasil — não invente exigências fora das NRs.
+
+${NR_REFERENCIA}
+
+Observe a imagem com atenção e responda SOMENTE com um JSON válido, sem markdown, sem crases, sem texto antes ou depois, no formato exato:
+{"descricao": "parágrafo objetivo em português, no tom formal de um relatório de segurança do trabalho, descrevendo a não conformidade observada e solicitando a regularização", "norma": "NR e item aplicável, ex: NR-18, item 18.13.1 (ou 'Não identificada' se genuinamente não houver NR aplicável)", "riscos": ["risco 1", "risco 2"], "adequacao": ["ação corretiva 1 (referenciando a exigência da NR quando fizer sentido)", "ação corretiva 2", "ação corretiva 3"]}
+Se a imagem não mostrar nenhuma não conformidade clara, ainda assim descreva objetivamente o que é visível na cena e liste riscos/ações genéricas cabíveis, indicando a NR mais próxima. Responda em português do Brasil.`;
 
 function limparJson(texto){
   return texto.replace(/```json|```/g, '').trim();
@@ -502,8 +520,12 @@ async function chamarAnthropic(pendingFoto){
 
 const PROMPT_MELHORAR_NOTA = (nota) => `Você é um técnico de segurança do trabalho. Um colega descreveu rapidamente, em poucas palavras, uma situação observada em uma foto de um canteiro de obras: "${nota}"
 
-Com base nessa descrição, produza um relatório formal de não conformidade. Responda SOMENTE com um JSON válido, sem markdown, sem crases, sem texto antes ou depois, no formato exato:
-{"descricao": "parágrafo objetivo em português, no tom formal de um relatório de segurança do trabalho, descrevendo a não conformidade e solicitando a regularização", "riscos": ["risco 1", "risco 2"], "adequacao": ["ação corretiva 1", "ação corretiva 2", "ação corretiva 3"]}
+A análise DEVE ser fundamentada nas Normas Regulamentadoras (NR) do Ministério do Trabalho do Brasil — não invente exigências fora das NRs.
+
+${NR_REFERENCIA}
+
+Com base na descrição do colega, produza um relatório formal de não conformidade. Responda SOMENTE com um JSON válido, sem markdown, sem crases, sem texto antes ou depois, no formato exato:
+{"descricao": "parágrafo objetivo em português, no tom formal de um relatório de segurança do trabalho, descrevendo a não conformidade e solicitando a regularização", "norma": "NR e item aplicável, ex: NR-18, item 18.13.1 (ou 'Não identificada' se genuinamente não houver NR aplicável)", "riscos": ["risco 1", "risco 2"], "adequacao": ["ação corretiva 1 (referenciando a exigência da NR quando fizer sentido)", "ação corretiva 2", "ação corretiva 3"]}
 Responda em português do Brasil.`;
 
 async function chamarGroqTexto(nota){
@@ -566,6 +588,7 @@ async function analisarFotoComIA(){
     const parsed = usaGroqTexto ? await chamarGroqTexto(nota) : await chamarAnthropic(pendingFoto);
 
     document.getElementById('i-descricao').value = parsed.descricao || '';
+    document.getElementById('i-norma').value = parsed.norma || '';
     document.getElementById('i-riscos').value = (parsed.riscos || []).join('\n');
     document.getElementById('i-adequacao').value = (parsed.adequacao || []).join('\n');
     status.textContent = 'Sugestão gerada — revise antes de adicionar o item.';
@@ -593,6 +616,7 @@ function resetPhotoUI(){
 function clearItemForm(){
   document.getElementById('i-local').value = '';
   document.getElementById('i-descricao').value = '';
+  document.getElementById('i-norma').value = '';
   document.getElementById('i-riscos').value = '';
   document.getElementById('i-adequacao').value = '';
   document.getElementById('i-obs').value = '';
@@ -622,6 +646,7 @@ document.getElementById('btn-add-item').addEventListener('click', ()=>{
     local: document.getElementById('i-local').value.trim(),
     criadoEm: new Date(document.getElementById('i-criada').value).toISOString(),
     descricao,
+    norma: document.getElementById('i-norma').value.trim(),
     riscos: linhas(document.getElementById('i-riscos').value),
     adequacao: linhas(document.getElementById('i-adequacao').value),
     observacoes: document.getElementById('i-obs').value.trim()
@@ -646,11 +671,12 @@ function renderDraftItens(){
   }
   container.innerHTML = draftItens.map((it, idx)=>{
     const thumb = it.foto ? `<img src="${it.foto}" class="thumb">` : `<div class="no-thumb">sem foto</div>`;
+    const normaBadge = it.norma ? ` <span style="font-family:'Roboto Mono',monospace;font-size:11px;color:var(--gold-light);background:var(--navy);padding:2px 6px;border-radius:4px;">${escapeHtml(it.norma)}</span>` : '';
     return `<div class="item-row">
       <span class="num">${idx+1}</span>
       ${thumb}
       <div class="body">
-        <div class="meta">${formatarDataModelo(it.criadoEm)}${it.local ? ' · ' + escapeHtml(it.local) : ''}</div>
+        <div class="meta">${formatarDataModelo(it.criadoEm)}${it.local ? ' · ' + escapeHtml(it.local) : ''}${normaBadge}</div>
         <div class="desc">${escapeHtml(it.descricao || '(sem descrição)').slice(0,140)}${(it.descricao||'').length>140?'…':''}</div>
       </div>
       <div class="row-actions">
@@ -676,6 +702,7 @@ function editDraftItem(idx){
   editingItemIndex = idx;
   document.getElementById('i-local').value = it.local || '';
   document.getElementById('i-descricao').value = it.descricao || '';
+  document.getElementById('i-norma').value = it.norma || '';
   document.getElementById('i-riscos').value = (it.riscos||[]).join('\n');
   document.getElementById('i-adequacao').value = (it.adequacao||[]).join('\n');
   document.getElementById('i-obs').value = it.observacoes || '';
@@ -893,6 +920,9 @@ function gerarPdfRelatorio(rel){
     }
     if(item.descricao){
       blocks.push({bold:false, lines: doc.splitTextToSize(item.descricao, TEXT_W)});
+    }
+    if(item.norma){
+      blocks.push({bold:true, lines: doc.splitTextToSize('Norma de referência: ' + item.norma, TEXT_W)});
     }
     if(item.riscos && item.riscos.length){
       blocks.push({bold:true, lines:['Riscos:']});
