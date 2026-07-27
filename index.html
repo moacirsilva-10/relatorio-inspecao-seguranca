@@ -134,6 +134,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
   <nav class="sidebar">
     <button class="nav-btn active" data-view="novo">Novo Relatório</button>
     <button class="nav-btn" data-view="salvos">Relatórios Salvos <span class="count-badge" id="badge-total">0</span></button>
+    <button class="nav-btn" data-view="config">Configurações</button>
   </nav>
 
   <main>
@@ -198,11 +199,57 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
         <div id="relatorios-container"></div>
       </div>
     </section>
+
+    <!-- CONFIGURAÇÕES -->
+    <section class="view" id="view-config">
+      <div class="card">
+        <h2>Configurações</h2>
+        <div class="form-grid">
+          <div class="full">
+            <label>Chave de API da Anthropic (para análise de fotos com IA)</label>
+            <input type="password" id="cfg-api-key" placeholder="sk-ant-...">
+            <p class="hint">Necessária para usar o botão "Analisar foto com IA" quando o site está fora do Claude.ai (ex: GitHub Pages). A chave fica salva apenas neste navegador (localStorage) — nunca é enviada para nenhum outro lugar além da própria Anthropic. Você pode gerar uma em <span style="font-family:'Roboto Mono',monospace;">console.anthropic.com</span>, em "API Keys".</p>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-outline" id="btn-remover-key">Remover chave</button>
+          <button class="btn btn-primary" id="btn-salvar-key">Salvar chave</button>
+        </div>
+        <p class="hint" id="cfg-key-status" style="margin-top:10px;"></p>
+      </div>
+    </section>
   </main>
 </div>
 
 <script>
 const { jsPDF } = window.jspdf;
+
+// ---------- Storage adapter: uses window.storage inside Claude.ai artifacts,
+// falls back to browser localStorage when hosted standalone (e.g. GitHub Pages) ----------
+const hasClaudeStorage = typeof window.storage !== 'undefined';
+const storageAdapter = {
+  async get(key){
+    if(hasClaudeStorage) return window.storage.get(key, true);
+    const v = localStorage.getItem(key);
+    return v !== null ? { key, value: v } : null;
+  },
+  async set(key, value){
+    if(hasClaudeStorage) return window.storage.set(key, value, true);
+    localStorage.setItem(key, value);
+    return { key, value };
+  },
+  async delete(key){
+    if(hasClaudeStorage) return window.storage.delete(key, true);
+    localStorage.removeItem(key);
+    return { key, deleted: true };
+  },
+  async list(prefix){
+    if(hasClaudeStorage) return window.storage.list(prefix, true);
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    return { keys };
+  }
+};
+
 
 let draftItens = [];
 let editingRelatorioId = null;
@@ -234,12 +281,12 @@ document.getElementById('i-criada').value = nowLocalInputValue();
 // ---------- Storage ----------
 async function loadAllRelatorios(){
   try{
-    const list = await window.storage.list('relatorio:', true);
+    const list = await storageAdapter.list('relatorio:');
     if(!list || !list.keys){ allRelatorios = []; return; }
     const out = [];
     for(const key of list.keys){
       try{
-        const res = await window.storage.get(key, true);
+        const res = await storageAdapter.get(key);
         if(res && res.value) out.push(JSON.parse(res.value));
       }catch(e){}
     }
@@ -254,10 +301,10 @@ async function loadAllRelatorios(){
 async function nextRelatorioId(){
   let n = 1;
   try{
-    const res = await window.storage.get('relatorio-counter', true);
+    const res = await storageAdapter.get('relatorio-counter');
     if(res && res.value) n = parseInt(res.value) + 1;
   }catch(e){ n = 1; }
-  await window.storage.set('relatorio-counter', String(n), true);
+  await storageAdapter.set('relatorio-counter', String(n));
   return 'rel_' + n;
 }
 
@@ -269,7 +316,29 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if(btn.dataset.view === 'salvos') renderRelatorios();
+    if(btn.dataset.view === 'config') loadConfigView();
   });
+});
+
+// ---------- API key config ----------
+function loadConfigView(){
+  const key = localStorage.getItem('anthropic_api_key') || '';
+  document.getElementById('cfg-api-key').value = key;
+  document.getElementById('cfg-key-status').textContent = key ? 'Chave salva neste navegador.' : 'Nenhuma chave salva ainda.';
+}
+document.getElementById('btn-salvar-key').addEventListener('click', ()=>{
+  const key = document.getElementById('cfg-api-key').value.trim();
+  if(!key){
+    alert('Cole uma chave de API válida antes de salvar.');
+    return;
+  }
+  localStorage.setItem('anthropic_api_key', key);
+  document.getElementById('cfg-key-status').textContent = 'Chave salva neste navegador.';
+});
+document.getElementById('btn-remover-key').addEventListener('click', ()=>{
+  localStorage.removeItem('anthropic_api_key');
+  document.getElementById('cfg-api-key').value = '';
+  document.getElementById('cfg-key-status').textContent = 'Chave removida.';
 });
 
 // ---------- Photo handling ----------
@@ -322,6 +391,12 @@ async function analisarFotoComIA(){
     alert('Escolha uma foto primeiro.');
     return;
   }
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if(!hasClaudeStorage && !apiKey){
+    alert('Para usar a análise por IA fora do Claude.ai, cadastre sua chave da Anthropic em "Configurações" primeiro.');
+    document.querySelector('.nav-btn[data-view="config"]').click();
+    return;
+  }
   const btn = document.getElementById('btn-analisar-ia');
   const status = document.getElementById('ia-status');
   btn.disabled = true;
@@ -330,9 +405,16 @@ async function analisarFotoComIA(){
     const base64 = pendingFoto.dataUrl.split(',')[1];
     const mediaType = pendingFoto.dataUrl.match(/data:(.*?);base64/)[1];
 
+    const headers = { 'Content-Type': 'application/json' };
+    if(!hasClaudeStorage){
+      headers['x-api-key'] = apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 1000,
@@ -529,7 +611,7 @@ document.getElementById('btn-salvar-relatorio').addEventListener('click', async 
       criadoEm: editingRelatorioId ? (allRelatorios.find(r=>r.id===editingRelatorioId)?.criadoEm || new Date().toISOString()) : new Date().toISOString(),
       itens: draftItens
     };
-    await window.storage.set('relatorio:' + id, JSON.stringify(relatorio), true);
+    await storageAdapter.set('relatorio:' + id, JSON.stringify(relatorio));
     await loadAllRelatorios();
     draftItens = [];
     editingRelatorioId = null;
@@ -579,7 +661,7 @@ async function renderRelatorios(){
   container.querySelectorAll('[data-del-rel]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!confirm('Excluir este relatório permanentemente?')) return;
-      await window.storage.delete('relatorio:' + btn.dataset.delRel, true);
+      await storageAdapter.delete('relatorio:' + btn.dataset.delRel);
       renderRelatorios();
     });
   });
