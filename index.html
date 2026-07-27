@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório de Inspeção — Segurança do Trabalho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --navy:#0B1F3A;
+  --navy-light:#14315C;
+  --gold:#C9A227;
+  --gold-light:#E8C766;
+  --bg:#F3F4F6;
+  --card:#FFFFFF;
+  --risk-alto:#C0392B;
+  --text:#1A1D23;
+  --text-muted:#6B7280;
+  --border:#E2E5EA;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+.app{display:flex;min-height:100vh;flex-wrap:wrap;}
+
+.hazard-stripe{height:8px;width:100%;background:repeating-linear-gradient(45deg,var(--navy) 0 14px,var(--gold) 14px 28px);}
+.hazard-stripe-thin{height:5px;background:repeating-linear-gradient(45deg,var(--navy) 0 10px,var(--gold) 10px 20px);border-radius:3px;}
+
+header.topbar{width:100%;background:var(--navy);color:#fff;padding:22px 32px 18px;}
+header.topbar .brand{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;}
+header.topbar .brand-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;letter-spacing:2px;color:var(--gold-light);text-transform:uppercase;}
+header.topbar .obra-tag{font-family:'Roboto Mono',monospace;font-size:12px;color:#B9C2D4;}
+header.topbar h1{font-family:'Oswald',sans-serif;font-weight:700;font-size:24px;letter-spacing:0.5px;margin:6px 0 0;text-transform:uppercase;}
+
+nav.sidebar{background:var(--navy-light);width:220px;flex-shrink:0;padding:24px 0;border-right:4px solid var(--gold);}
+nav.sidebar button{display:flex;align-items:center;gap:10px;width:100%;background:none;border:none;color:#CBD5E5;font-family:'Oswald',sans-serif;font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:14px 24px;cursor:pointer;text-align:left;border-left:4px solid transparent;transition:.15s;}
+nav.sidebar button:hover{background:rgba(255,255,255,.06);color:#fff;}
+nav.sidebar button.active{background:rgba(201,162,39,.12);color:#fff;border-left-color:var(--gold);}
+nav.sidebar .count-badge{margin-left:auto;background:var(--gold);color:var(--navy);font-family:'Roboto Mono',monospace;font-size:11px;padding:1px 7px;border-radius:10px;}
+
+main{flex:1;padding:32px;min-width:0;}
+.view{display:none;}
+.view.active{display:block;}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px;margin-bottom:20px;}
+.card h2{font-family:'Oswald',sans-serif;font-size:18px;text-transform:uppercase;letter-spacing:1px;margin:0 0 18px;color:var(--navy);}
+.card h3{font-family:'Oswald',sans-serif;font-size:14px;text-transform:uppercase;letter-spacing:.8px;margin:0 0 12px;color:var(--navy-light);}
+
+.form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+.form-grid .full{grid-column:1/-1;}
+label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+.hint{font-size:11px;color:var(--text-muted);margin-top:4px;}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-family:'Inter',sans-serif;font-size:14px;color:var(--text);background:#fff;}
+textarea{resize:vertical;min-height:60px;}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--gold);border-color:var(--gold);}
+
+.btn{font-family:'Oswald',sans-serif;text-transform:uppercase;letter-spacing:1px;font-size:13px;padding:11px 22px;border-radius:6px;border:none;cursor:pointer;font-weight:600;}
+.btn-primary{background:var(--navy);color:#fff;}
+.btn-primary:hover{background:var(--navy-light);}
+.btn-gold{background:var(--gold);color:var(--navy);}
+.btn-gold:hover{background:var(--gold-light);}
+.btn-outline{background:none;border:1px solid var(--border);color:var(--text);}
+.btn-outline:hover{border-color:var(--navy);}
+.btn-danger{background:none;border:1px solid var(--risk-alto);color:var(--risk-alto);}
+.btn-danger:hover{background:#F8DEDA;}
+.btn-sm{padding:6px 12px;font-size:11px;}
+.actions-row{display:flex;gap:10px;margin-top:18px;justify-content:flex-end;}
+
+hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
+
+/* Item builder */
+.item-form{border:1px dashed var(--border);border-radius:8px;padding:18px;background:#FAFBFC;}
+.photo-drop{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:#fff;}
+.photo-drop:hover{border-color:var(--gold);}
+.photo-preview{max-width:100%;max-height:180px;border-radius:6px;display:block;margin:0 auto 8px;}
+.photo-drop input{display:none;}
+
+.item-list{display:flex;flex-direction:column;gap:10px;margin-top:16px;}
+.item-row{display:flex;gap:14px;border:1px solid var(--border);border-radius:8px;padding:12px;align-items:flex-start;background:#fff;}
+.item-row .num{font-family:'Roboto Mono',monospace;color:var(--gold);background:var(--navy);border-radius:5px;padding:3px 8px;font-size:12px;flex-shrink:0;}
+.item-row img.thumb{width:64px;height:64px;object-fit:cover;border-radius:5px;flex-shrink:0;}
+.item-row .no-thumb{width:64px;height:64px;border-radius:5px;flex-shrink:0;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:10px;text-align:center;}
+.item-row .body{flex:1;min-width:0;}
+.item-row .body .meta{font-family:'Roboto Mono',monospace;font-size:11px;color:var(--text-muted);}
+.item-row .body .desc{font-size:13.5px;margin-top:3px;color:var(--text);}
+.item-row .row-actions{display:flex;gap:6px;flex-shrink:0;}
+
+.empty-state{text-align:center;padding:50px 20px;color:var(--text-muted);}
+.empty-state .hazard-stripe-thin{width:80px;margin:0 auto 16px;}
+
+/* Relatórios salvos */
+.relatorio-card{border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;background:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;}
+.relatorio-card .info h3{margin:0 0 4px;font-size:15px;color:var(--navy);font-family:'Oswald',sans-serif;letter-spacing:.5px;}
+.relatorio-card .info p{margin:0;font-size:12.5px;color:var(--text-muted);font-family:'Roboto Mono',monospace;}
+.relatorio-card .buttons{display:flex;gap:8px;flex-wrap:wrap;}
+
+@media (max-width:800px){
+  .form-grid{grid-template-columns:1fr;}
+  nav.sidebar{width:100%;border-right:none;border-bottom:4px solid var(--gold);display:flex;padding:0;}
+  nav.sidebar button{flex:1;padding:16px 10px;font-size:12px;text-align:center;justify-content:center;border-left:none;border-bottom:4px solid transparent;}
+  nav.sidebar button.active{border-left:none;border-bottom-color:var(--gold);}
+  nav.sidebar .count-badge{margin-left:6px;}
+  .app{flex-direction:column;}
+  main{padding:16px;}
+  header.topbar{padding:16px 18px 14px;}
+  header.topbar h1{font-size:19px;}
+  .card{padding:16px;}
+  .card h2{font-size:15px;}
+  input,select,textarea,.btn{font-size:16px;}
+  .btn{width:100%;}
+  .actions-row{flex-direction:column-reverse;}
+  .actions-row .btn{width:100%;}
+  .item-row{flex-wrap:wrap;}
+  .item-row .row-actions{width:100%;justify-content:flex-end;margin-top:6px;}
+  .relatorio-card{flex-direction:column;align-items:stretch;}
+  .relatorio-card .buttons{justify-content:stretch;}
+  .relatorio-card .buttons .btn{flex:1;}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar" style="order:-1;width:100%;">
+    <div class="brand">
+      <span class="brand-name">Itapema Empreendimentos</span>
+      <span class="obra-tag">SEGURANÇA DO TRABALHO</span>
+    </div>
+    <h1>Relatório de Inspeção</h1>
+  </header>
+  <div class="hazard-stripe" style="order:-1;"></div>
+
+  <nav class="sidebar">
+    <button class="nav-btn active" data-view="novo">Novo Relatório</button>
+    <button class="nav-btn" data-view="salvos">Relatórios Salvos <span class="count-badge" id="badge-total">0</span></button>
+  </nav>
+
+  <main>
+    <!-- NOVO RELATÓRIO -->
+    <section class="view active" id="view-novo">
+      <div class="card">
+        <h2>Dados do Relatório</h2>
+        <div class="form-grid">
+          <div><label>Contato (responsável técnico)</label><input type="text" id="r-contato" placeholder="Ex: Vitória - Técnica Segurança do Trabalho" value="Moacir Gomes"></div>
+          <div><label>Empresa</label><input type="text" id="r-empresa" placeholder="Ex: Itapema Empreendimentos" value="RG Itapema Empreendimentos"></div>
+          <div><label>Localização</label><input type="text" id="r-localizacao" placeholder="Aura" value="Aura"></div>
+          <div class="full"><label>Título do relatório</label><input type="text" id="r-titulo" placeholder="Ex: AURA 410 - 04/05/2026"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Itens da Inspeção <span id="badge-itens-draft" style="font-family:'Roboto Mono',monospace;font-size:13px;color:var(--text-muted);"></span></h2>
+
+        <div class="item-form" id="item-form">
+          <h3 id="item-form-title">Adicionar item</h3>
+          <div class="form-grid">
+            <div class="full">
+              <label>Foto</label>
+              <div class="photo-drop" id="photo-drop">
+                <input type="file" id="i-foto" accept="image/*" capture="environment">
+                <div id="photo-drop-inner">
+                  <p style="margin:6px 0;color:var(--text-muted);font-size:13px;">Toque para tirar foto ou escolher da galeria</p>
+                </div>
+              </div>
+              <p class="hint" id="foto-nome-hint"></p>
+              <div id="ia-analyze-row" style="display:none;margin-top:10px;">
+                <button class="btn btn-gold btn-sm" id="btn-analisar-ia" type="button">✨ Analisar foto com IA</button>
+                <span id="ia-status" style="margin-left:10px;font-size:12px;color:var(--text-muted);"></span>
+              </div>
+            </div>
+            <div><label>Local / Pavimento (opcional)</label><input type="text" id="i-local" placeholder="Ex: PAV.: TÉRREO"></div>
+            <div><label>Criada</label><input type="datetime-local" id="i-criada"></div>
+            <div class="full"><label>Descrição</label><textarea id="i-descricao" placeholder="Descreva o que foi observado..."></textarea></div>
+            <div class="full"><label>Riscos (um por linha, opcional)</label><textarea id="i-riscos" placeholder="Tropeço/queda&#10;Acesso dificultado em emergência"></textarea></div>
+            <div class="full"><label>Adequação / Exigências (um por linha, opcional)</label><textarea id="i-adequacao" placeholder="Remover materiais e desobstruir o caminho&#10;Manter rota livre e sinalizada"></textarea></div>
+            <div class="full"><label>Observações finais (opcional)</label><textarea id="i-obs" placeholder="Parágrafo de encerramento, se necessário..."></textarea></div>
+          </div>
+          <div class="actions-row">
+            <button class="btn btn-outline" id="btn-cancelar-item" style="display:none;">Cancelar edição</button>
+            <button class="btn btn-primary" id="btn-add-item">Adicionar item à lista</button>
+          </div>
+        </div>
+
+        <div class="item-list" id="item-list"></div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn btn-outline" id="btn-limpar-rascunho">Limpar rascunho</button>
+        <button class="btn btn-primary" id="btn-salvar-relatorio">Salvar Relatório</button>
+      </div>
+    </section>
+
+    <!-- RELATÓRIOS SALVOS -->
+    <section class="view" id="view-salvos">
+      <div class="card">
+        <h2>Relatórios Salvos</h2>
+        <div id="relatorios-container"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let draftItens = [];
+let editingRelatorioId = null;
+let editingItemIndex = null;
+let allRelatorios = [];
+
+const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const DIAS = ['dom','seg','ter','qua','qui','sex','sáb'];
+
+function formatarDataModelo(iso){
+  const d = new Date(iso);
+  if(isNaN(d)) return '-';
+  const dia = DIAS[d.getDay()];
+  const num = String(d.getDate()).padStart(2,'0');
+  const mes = MESES[d.getMonth()];
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  const ano = d.getFullYear();
+  return `${dia}. ${num} ${mes}. ${hh}:${mm} ${ano}`;
+}
+
+function nowLocalInputValue(){
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0,16);
+}
+document.getElementById('i-criada').value = nowLocalInputValue();
+
+// ---------- Storage ----------
+async function loadAllRelatorios(){
+  try{
+    const list = await window.storage.list('relatorio:', true);
+    if(!list || !list.keys){ allRelatorios = []; return; }
+    const out = [];
+    for(const key of list.keys){
+      try{
+        const res = await window.storage.get(key, true);
+        if(res && res.value) out.push(JSON.parse(res.value));
+      }catch(e){}
+    }
+    out.sort((a,b)=> new Date(b.criadoEm) - new Date(a.criadoEm));
+    allRelatorios = out;
+  }catch(e){
+    console.error(e);
+    allRelatorios = [];
+  }
+}
+
+async function nextRelatorioId(){
+  let n = 1;
+  try{
+    const res = await window.storage.get('relatorio-counter', true);
+    if(res && res.value) n = parseInt(res.value) + 1;
+  }catch(e){ n = 1; }
+  await window.storage.set('relatorio-counter', String(n), true);
+  return 'rel_' + n;
+}
+
+// ---------- Navigation ----------
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if(btn.dataset.view === 'salvos') renderRelatorios();
+  });
+});
+
+// ---------- Photo handling ----------
+let pendingFoto = null; // { dataUrl, nome, width, height }
+document.getElementById('photo-drop').addEventListener('click', ()=> document.getElementById('i-foto').click());
+document.getElementById('i-foto').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    pendingFoto = await compressImage(file);
+    const inner = document.getElementById('photo-drop-inner');
+    inner.innerHTML = `<img src="${pendingFoto.dataUrl}" class="photo-preview">`;
+    document.getElementById('foto-nome-hint').textContent = pendingFoto.nome;
+    document.getElementById('ia-analyze-row').style.display = 'block';
+    document.getElementById('ia-status').textContent = '';
+  }catch(err){
+    console.error(err);
+    alert('Não foi possível processar essa imagem.');
+  }
+});
+
+function compressImage(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const maxDim = 1100;
+        let w = img.width, h = img.height;
+        if(w > maxDim || h > maxDim){
+          if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.62);
+        resolve({ dataUrl, nome: file.name, width: w, height: h });
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function analisarFotoComIA(){
+  if(!pendingFoto){
+    alert('Escolha uma foto primeiro.');
+    return;
+  }
+  const btn = document.getElementById('btn-analisar-ia');
+  const status = document.getElementById('ia-status');
+  btn.disabled = true;
+  status.textContent = 'Analisando foto...';
+  try{
+    const base64 = pendingFoto.dataUrl.split(',')[1];
+    const mediaType = pendingFoto.dataUrl.match(/data:(.*?);base64/)[1];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: `Você é um técnico de segurança do trabalho analisando uma foto de um canteiro de obras para um relatório de não conformidade. Observe a imagem com atenção e responda SOMENTE com um JSON válido, sem markdown, sem crases, sem texto antes ou depois, no formato exato:
+{"descricao": "parágrafo objetivo em português, no tom formal de um relatório de segurança do trabalho, descrevendo a não conformidade observada e solicitando a regularização", "riscos": ["risco 1", "risco 2"], "adequacao": ["ação corretiva 1", "ação corretiva 2", "ação corretiva 3"]}
+Se a imagem não mostrar nenhuma não conformidade clara de segurança do trabalho, ainda assim descreva objetivamente o que é visível na cena e liste riscos/ações genéricas cabíveis. Responda em português do Brasil.` }
+          ]
+        }]
+      })
+    });
+
+    if(!response.ok){
+      throw new Error('Falha na chamada da API: ' + response.status);
+    }
+    const data = await response.json();
+    const textBlock = data.content.find(b => b.type === 'text');
+    if(!textBlock) throw new Error('Resposta sem texto');
+    const cleaned = textBlock.text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    document.getElementById('i-descricao').value = parsed.descricao || '';
+    document.getElementById('i-riscos').value = (parsed.riscos || []).join('\n');
+    document.getElementById('i-adequacao').value = (parsed.adequacao || []).join('\n');
+    status.textContent = 'Sugestão gerada — revise antes de adicionar o item.';
+  }catch(e){
+    console.error(e);
+    status.textContent = 'Não foi possível analisar a foto agora.';
+  }finally{
+    btn.disabled = false;
+  }
+}
+document.getElementById('btn-analisar-ia').addEventListener('click', analisarFotoComIA);
+
+function resetPhotoUI(){
+  pendingFoto = null;
+  document.getElementById('i-foto').value = '';
+  document.getElementById('photo-drop-inner').innerHTML = `<p style="margin:6px 0;color:var(--text-muted);font-size:13px;">Toque para tirar foto ou escolher da galeria</p>`;
+  document.getElementById('foto-nome-hint').textContent = '';
+  document.getElementById('ia-analyze-row').style.display = 'none';
+  document.getElementById('ia-status').textContent = '';
+}
+
+// ---------- Item form ----------
+function clearItemForm(){
+  document.getElementById('i-local').value = '';
+  document.getElementById('i-descricao').value = '';
+  document.getElementById('i-riscos').value = '';
+  document.getElementById('i-adequacao').value = '';
+  document.getElementById('i-obs').value = '';
+  document.getElementById('i-criada').value = nowLocalInputValue();
+  resetPhotoUI();
+  editingItemIndex = null;
+  document.getElementById('item-form-title').textContent = 'Adicionar item';
+  document.getElementById('btn-add-item').textContent = 'Adicionar item à lista';
+  document.getElementById('btn-cancelar-item').style.display = 'none';
+}
+
+function linhas(texto){
+  return texto.split('\n').map(l=>l.trim()).filter(Boolean);
+}
+
+document.getElementById('btn-add-item').addEventListener('click', ()=>{
+  const descricao = document.getElementById('i-descricao').value.trim();
+  if(!descricao && !pendingFoto){
+    alert('Adicione ao menos uma foto ou uma descrição para este item.');
+    return;
+  }
+  const item = {
+    foto: pendingFoto ? pendingFoto.dataUrl : null,
+    fotoNome: pendingFoto ? pendingFoto.nome : null,
+    fotoWidth: pendingFoto ? pendingFoto.width : null,
+    fotoHeight: pendingFoto ? pendingFoto.height : null,
+    local: document.getElementById('i-local').value.trim(),
+    criadoEm: new Date(document.getElementById('i-criada').value).toISOString(),
+    descricao,
+    riscos: linhas(document.getElementById('i-riscos').value),
+    adequacao: linhas(document.getElementById('i-adequacao').value),
+    observacoes: document.getElementById('i-obs').value.trim()
+  };
+  if(editingItemIndex !== null){
+    draftItens[editingItemIndex] = item;
+  } else {
+    draftItens.push(item);
+  }
+  clearItemForm();
+  renderDraftItens();
+});
+
+document.getElementById('btn-cancelar-item').addEventListener('click', clearItemForm);
+
+function renderDraftItens(){
+  const container = document.getElementById('item-list');
+  document.getElementById('badge-itens-draft').textContent = draftItens.length ? `(${draftItens.length} item${draftItens.length>1?'s':''})` : '';
+  if(draftItens.length === 0){
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = draftItens.map((it, idx)=>{
+    const thumb = it.foto ? `<img src="${it.foto}" class="thumb">` : `<div class="no-thumb">sem foto</div>`;
+    return `<div class="item-row">
+      <span class="num">${idx+1}</span>
+      ${thumb}
+      <div class="body">
+        <div class="meta">${formatarDataModelo(it.criadoEm)}${it.local ? ' · ' + escapeHtml(it.local) : ''}</div>
+        <div class="desc">${escapeHtml(it.descricao || '(sem descrição)').slice(0,140)}${(it.descricao||'').length>140?'…':''}</div>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-outline btn-sm" data-edit="${idx}">Editar</button>
+        <button class="btn btn-danger btn-sm" data-remove="${idx}">Remover</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('[data-edit]').forEach(btn=>{
+    btn.addEventListener('click', ()=> editDraftItem(parseInt(btn.dataset.edit)));
+  });
+  container.querySelectorAll('[data-remove]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      draftItens.splice(parseInt(btn.dataset.remove), 1);
+      renderDraftItens();
+    });
+  });
+}
+
+function editDraftItem(idx){
+  const it = draftItens[idx];
+  editingItemIndex = idx;
+  document.getElementById('i-local').value = it.local || '';
+  document.getElementById('i-descricao').value = it.descricao || '';
+  document.getElementById('i-riscos').value = (it.riscos||[]).join('\n');
+  document.getElementById('i-adequacao').value = (it.adequacao||[]).join('\n');
+  document.getElementById('i-obs').value = it.observacoes || '';
+  const d = new Date(it.criadoEm);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  document.getElementById('i-criada').value = d.toISOString().slice(0,16);
+  if(it.foto){
+    pendingFoto = { dataUrl: it.foto, nome: it.fotoNome, width: it.fotoWidth, height: it.fotoHeight };
+    document.getElementById('photo-drop-inner').innerHTML = `<img src="${it.foto}" class="photo-preview">`;
+    document.getElementById('foto-nome-hint').textContent = it.fotoNome || '';
+    document.getElementById('ia-analyze-row').style.display = 'block';
+    document.getElementById('ia-status').textContent = '';
+  } else {
+    resetPhotoUI();
+  }
+  document.getElementById('item-form-title').textContent = `Editando item ${idx+1}`;
+  document.getElementById('btn-add-item').textContent = 'Salvar alterações do item';
+  document.getElementById('btn-cancelar-item').style.display = 'inline-block';
+  document.getElementById('item-form').scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+// ---------- Save relatório ----------
+document.getElementById('btn-limpar-rascunho').addEventListener('click', ()=>{
+  if(!confirm('Limpar todos os itens e campos do rascunho atual?')) return;
+  draftItens = [];
+  editingRelatorioId = null;
+  document.getElementById('r-contato').value = 'Moacir Gomes';
+  document.getElementById('r-empresa').value = 'RG Itapema Empreendimentos';
+  document.getElementById('r-titulo').value = '';
+  document.getElementById('r-localizacao').value = 'Aura';
+  clearItemForm();
+  renderDraftItens();
+});
+
+document.getElementById('btn-salvar-relatorio').addEventListener('click', async ()=>{
+  if(draftItens.length === 0){
+    alert('Adicione ao menos um item antes de salvar o relatório.');
+    return;
+  }
+  const titulo = document.getElementById('r-titulo').value.trim();
+  if(!titulo){
+    alert('Informe um título para o relatório.');
+    return;
+  }
+  const btn = document.getElementById('btn-salvar-relatorio');
+  btn.disabled = true; btn.textContent = 'Salvando...';
+  try{
+    const id = editingRelatorioId || await nextRelatorioId();
+    const relatorio = {
+      id,
+      contato: document.getElementById('r-contato').value.trim(),
+      empresa: document.getElementById('r-empresa').value.trim(),
+      localizacao: document.getElementById('r-localizacao').value.trim(),
+      titulo,
+      criadoEm: editingRelatorioId ? (allRelatorios.find(r=>r.id===editingRelatorioId)?.criadoEm || new Date().toISOString()) : new Date().toISOString(),
+      itens: draftItens
+    };
+    await window.storage.set('relatorio:' + id, JSON.stringify(relatorio), true);
+    await loadAllRelatorios();
+    draftItens = [];
+    editingRelatorioId = null;
+    renderDraftItens();
+    alert(`Relatório "${titulo}" salvo com sucesso.`);
+    document.querySelector('.nav-btn[data-view="salvos"]').click();
+  }catch(e){
+    console.error(e);
+    alert('Não foi possível salvar o relatório. Tente novamente.');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Salvar Relatório';
+  }
+});
+
+// ---------- Relatórios salvos ----------
+async function renderRelatorios(){
+  await loadAllRelatorios();
+  document.getElementById('badge-total').textContent = allRelatorios.length;
+  const container = document.getElementById('relatorios-container');
+  if(allRelatorios.length === 0){
+    container.innerHTML = `<div class="empty-state"><div class="hazard-stripe-thin"></div><p>Nenhum relatório salvo ainda. Crie um em "Novo Relatório".</p></div>`;
+    return;
+  }
+  container.innerHTML = allRelatorios.map(r=>`
+    <div class="relatorio-card">
+      <div class="info">
+        <h3>${escapeHtml(r.titulo)}</h3>
+        <p>Localização: ${escapeHtml(r.localizacao||'-')} · ${r.itens.length} item(ns) · Criado em ${formatarDataModelo(r.criadoEm)}</p>
+      </div>
+      <div class="buttons">
+        <button class="btn btn-outline btn-sm" data-edit-rel="${r.id}">Editar</button>
+        <button class="btn btn-gold btn-sm" data-pdf-rel="${r.id}">Gerar PDF</button>
+        <button class="btn btn-danger btn-sm" data-del-rel="${r.id}">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('[data-edit-rel]').forEach(btn=>{
+    btn.addEventListener('click', ()=> carregarRelatorioParaEdicao(btn.dataset.editRel));
+  });
+  container.querySelectorAll('[data-pdf-rel]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const rel = allRelatorios.find(r=>r.id===btn.dataset.pdfRel);
+      gerarPdfRelatorio(rel);
+    });
+  });
+  container.querySelectorAll('[data-del-rel]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      if(!confirm('Excluir este relatório permanentemente?')) return;
+      await window.storage.delete('relatorio:' + btn.dataset.delRel, true);
+      renderRelatorios();
+    });
+  });
+}
+
+function carregarRelatorioParaEdicao(id){
+  const rel = allRelatorios.find(r=>r.id===id);
+  if(!rel) return;
+  editingRelatorioId = rel.id;
+  document.getElementById('r-contato').value = rel.contato || 'Moacir Gomes';
+  document.getElementById('r-empresa').value = rel.empresa || 'RG Itapema Empreendimentos';
+  document.getElementById('r-localizacao').value = rel.localizacao || '';
+  document.getElementById('r-titulo').value = rel.titulo || '';
+  draftItens = JSON.parse(JSON.stringify(rel.itens));
+  clearItemForm();
+  renderDraftItens();
+  document.querySelector('.nav-btn[data-view="novo"]').click();
+}
+
+// ---------- PDF generation matching reference model ----------
+const PAGE_W = 210, PAGE_H = 297;
+const MARGIN_L = 14, MARGIN_R = 196;
+const HEADER_TOP = 14, HEADER_DIVIDER_Y = 33, CONTENT_START = 40;
+const CONTENT_END = 272, FOOTER_DIVIDER_Y = 278, FOOTER_TEXT_Y = 287;
+const NUM_X = 14, PHOTO_X = 24, PHOTO_MAXW = 92, PHOTO_MAXH = 78;
+const TEXT_X = 124, TEXT_W = 72;
+
+function drawHeader(doc, rel){
+  doc.setFont(undefined,'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(20,20,20);
+  const leftRows = [
+    ['Contato:', rel.contato||'-'],
+    ['Empresa:', rel.empresa||'-']
+  ];
+  const rightRows = [
+    ['Criada:', formatarDataModelo(rel.criadoEm)],
+    ['Localização:', rel.localizacao||'-'],
+    ['Título:', rel.titulo||'-'],
+    ['No. Items:', String(rel.itens.length)]
+  ];
+
+  let yLeft = HEADER_TOP;
+  leftRows.forEach(([label, value])=>{
+    doc.setFont(undefined,'bold');
+    doc.text(label, MARGIN_L, yLeft);
+    doc.setFont(undefined,'normal');
+    doc.text(String(value), MARGIN_L + 20, yLeft);
+    yLeft += 5.2;
+  });
+
+  let yRight = HEADER_TOP;
+  rightRows.forEach(([label, value])=>{
+    doc.setFont(undefined,'bold');
+    doc.text(label, 130, yRight);
+    doc.setFont(undefined,'normal');
+    const rv = doc.splitTextToSize(String(value), 40);
+    doc.text(rv, 158, yRight);
+    yRight += 5.2;
+  });
+
+  doc.setDrawColor(20,20,20);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN_L, HEADER_DIVIDER_Y, MARGIN_R, HEADER_DIVIDER_Y);
+}
+
+function drawFooterDivider(doc, rel){
+  doc.setDrawColor(180,180,180);
+  doc.setLineWidth(0.2);
+  doc.line(MARGIN_L, FOOTER_DIVIDER_Y, MARGIN_R, FOOTER_DIVIDER_Y);
+}
+
+function newPage(doc, rel){
+  doc.addPage();
+  drawHeader(doc, rel);
+  return CONTENT_START;
+}
+
+function gerarPdfRelatorio(rel){
+  const doc = new jsPDF({ unit:'mm', format:'a4' });
+  drawHeader(doc, rel);
+  let y = CONTENT_START;
+
+  rel.itens.forEach((item, idx)=>{
+    doc.setFontSize(10.5);
+    doc.setFont(undefined,'normal');
+
+    // Build right column text blocks first to estimate height
+    doc.setFontSize(10);
+    const blocks = [];
+    doc.setFont(undefined,'bold');
+    blocks.push({bold:true, lines:[`Criada: ${formatarDataModelo(item.criadoEm)}`]});
+    if(item.local){
+      blocks.push({bold:false, lines: doc.splitTextToSize(item.local, TEXT_W)});
+    }
+    if(item.descricao){
+      blocks.push({bold:false, lines: doc.splitTextToSize(item.descricao, TEXT_W)});
+    }
+    if(item.riscos && item.riscos.length){
+      blocks.push({bold:true, lines:['Riscos:']});
+      item.riscos.forEach(r=> blocks.push({bold:false, lines: doc.splitTextToSize('* ' + r, TEXT_W)}));
+    }
+    if(item.adequacao && item.adequacao.length){
+      blocks.push({bold:true, lines:['Adequação:']});
+      item.adequacao.forEach(a=> blocks.push({bold:false, lines: doc.splitTextToSize('* ' + a, TEXT_W)}));
+    }
+    if(item.observacoes){
+      blocks.push({bold:false, lines: doc.splitTextToSize(item.observacoes, TEXT_W)});
+    }
+    blocks.push({bold:false, lines:['Comentários ___________________']});
+    blocks.push({bold:false, lines:['_______________________________']});
+    blocks.push({bold:false, lines:['_______________________________']});
+
+    let textHeight = 0;
+    blocks.forEach(b=> textHeight += b.lines.length * 5 + 2);
+
+    let photoW = 0, photoH = 0;
+    if(item.foto && item.fotoWidth && item.fotoHeight){
+      const ratio = item.fotoWidth / item.fotoHeight;
+      photoW = PHOTO_MAXW; photoH = photoW / ratio;
+      if(photoH > PHOTO_MAXH){ photoH = PHOTO_MAXH; photoW = photoH * ratio; }
+    }
+    const photoBlockHeight = item.foto ? photoH + 8 : 0;
+    const blockHeight = Math.max(textHeight, photoBlockHeight, 20);
+
+    if(y + blockHeight > CONTENT_END){
+      y = newPage(doc, rel);
+    }
+
+    const itemTop = y;
+
+    // Number label
+    doc.setFont(undefined,'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(90,90,90);
+    doc.text(`(${idx+1})`, NUM_X, itemTop + (item.foto ? photoH/2 : 4));
+
+    // Photo
+    if(item.foto){
+      try{
+        doc.addImage(item.foto, 'JPEG', PHOTO_X, itemTop, photoW, photoH);
+        doc.setFontSize(8);
+        doc.setTextColor(110,110,110);
+        doc.text(item.fotoNome || '', PHOTO_X, itemTop + photoH + 5, { maxWidth: photoW });
+      }catch(e){ console.error('Erro ao inserir imagem', e); }
+    }
+
+    // Text column
+    let ty = itemTop + 4;
+    doc.setTextColor(20,20,20);
+    blocks.forEach(b=>{
+      doc.setFontSize(10);
+      doc.setFont(undefined, b.bold ? 'bold' : 'normal');
+      doc.text(b.lines, TEXT_X, ty);
+      ty += b.lines.length * 5 + 2;
+    });
+
+    y = itemTop + blockHeight + 10;
+  });
+
+  // Footer dividers + doc id on every page
+  const totalPages = doc.getNumberOfPages();
+  for(let p=1; p<=totalPages; p++){
+    doc.setPage(p);
+    drawFooterDivider(doc, rel);
+    doc.setFontSize(8.5);
+    doc.setTextColor(90,90,90);
+    doc.text(`página ${p} de ${totalPages}`, MARGIN_R, FOOTER_TEXT_Y, { align: 'right' });
+  }
+
+  doc.save(`${(rel.titulo || rel.id).replace(/[^a-z0-9\-_]+/gi,'_')}.pdf`);
+}
+
+// ---------- Init ----------
+renderDraftItens();
+loadAllRelatorios();
+</script>
+</body>
+</html>
