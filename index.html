@@ -239,6 +239,7 @@ hr.divider{border:none;border-top:1px solid var(--border);margin:22px 0;}
           <button class="btn btn-primary" id="btn-salvar-key">Salvar configuração</button>
         </div>
         <p class="hint" id="cfg-key-status" style="margin-top:10px;"></p>
+        <p class="hint" style="margin-top:20px;color:#B0B4BC;">Versão do app: 2026-07-27-v4</p>
       </div>
     </section>
   </main>
@@ -521,16 +522,16 @@ async function chamarGroqComModelo(pendingFoto, model, apiKey){
 
 async function chamarGroq(pendingFoto){
   const apiKey = localStorage.getItem('groq_api_key');
-  let lastError = null;
+  const tentativas = [];
   for(const model of GROQ_VISION_MODELS){
     try{
       return await chamarGroqComModelo(pendingFoto, model, apiKey);
     }catch(e){
       console.warn('Modelo Groq indisponível:', model, e.message);
-      lastError = e;
+      tentativas.push(`${model} → ${e.message}`);
     }
   }
-  throw new Error('Nenhum modelo de visão do Groq respondeu. Detalhes: ' + (lastError?.message || ''));
+  throw new Error('Nenhum modelo respondeu. ' + tentativas.join(' | '));
 }
 
 async function analisarFotoComIA(){
